@@ -253,11 +253,49 @@ public class OverlayService extends Service implements View.OnTouchListener {
         }
     }
 
+    private Point clampCoordinates(int x, int y, int windowWidth, int windowHeight) {
+        Display display = windowManager.getDefaultDisplay();
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        display.getRealMetrics(displayMetrics);
+        int screenWidth = displayMetrics.widthPixels;
+        int screenHeight = displayMetrics.heightPixels;
+        
+        // Account for status bar and navigation bar
+        int statusBarHeight = statusBarHeightPx();
+        int navBarHeight = navigationBarHeightPx();
+        
+        // Clamp X coordinate
+        int clampedX = x;
+        if (clampedX < 0) clampedX = 0;
+        if (clampedX + windowWidth > screenWidth) clampedX = screenWidth - windowWidth;
+        
+        // Clamp Y coordinate (accounting for status bar)
+        int clampedY = y;
+        if (clampedY < -statusBarHeight) clampedY = -statusBarHeight;
+        if (clampedY + windowHeight > screenHeight - navBarHeight) {
+            clampedY = screenHeight - windowHeight - navBarHeight;
+        }
+        
+        return new Point(clampedX, clampedY);
+    }
+
     private void moveOverlay(int x, int y, MethodChannel.Result result) {
         if (windowManager != null) {
             WindowManager.LayoutParams params = (WindowManager.LayoutParams) flutterView.getLayoutParams();
-            params.x = (x == -1999 || x == -1) ? -1 : dpToPx(x);
-            params.y = dpToPx(y);
+            int targetX = (x == -1999 || x == -1) ? -1 : dpToPx(x);
+            int targetY = dpToPx(y);
+            
+            // Only clamp if not using default positioning
+            if (targetX != -1) {
+                Point clampedPos = clampCoordinates(targetX, targetY, 
+                    flutterView.getWidth(), flutterView.getHeight());
+                params.x = clampedPos.x;
+                params.y = clampedPos.y;
+            } else {
+                params.x = targetX;
+                params.y = targetY;
+            }
+            
             windowManager.updateViewLayout(flutterView, params);
             if (result != null)
                 result.success(true);
@@ -283,8 +321,20 @@ public class OverlayService extends Service implements View.OnTouchListener {
         if (instance != null && instance.flutterView != null) {
             if (instance.windowManager != null) {
                 WindowManager.LayoutParams params = (WindowManager.LayoutParams) instance.flutterView.getLayoutParams();
-                params.x = (x == -1999 || x == -1) ? -1 : instance.dpToPx(x);
-                params.y = instance.dpToPx(y);
+                int targetX = (x == -1999 || x == -1) ? -1 : instance.dpToPx(x);
+                int targetY = instance.dpToPx(y);
+                
+                // Only clamp if not using default positioning
+                if (targetX != -1) {
+                    Point clampedPos = instance.clampCoordinates(targetX, targetY, 
+                        instance.flutterView.getWidth(), instance.flutterView.getHeight());
+                    params.x = clampedPos.x;
+                    params.y = clampedPos.y;
+                } else {
+                    params.x = targetX;
+                    params.y = targetY;
+                }
+                
                 instance.windowManager.updateViewLayout(instance.flutterView, params);
                 return true;
             } else {
@@ -400,8 +450,13 @@ public class OverlayService extends Service implements View.OnTouchListener {
                             || WindowSetup.gravity == (Gravity.BOTTOM | Gravity.RIGHT);
                     int xx = params.x + ((int) dx * (invertX ? -1 : 1));
                     int yy = params.y + ((int) dy * (invertY ? -1 : 1));
-                    params.x = xx;
-                    params.y = yy;
+                    
+                    // Clamp coordinates to keep overlay on screen
+                    Point clampedPos = clampCoordinates(xx, yy, 
+                        flutterView.getWidth(), flutterView.getHeight());
+                    params.x = clampedPos.x;
+                    params.y = clampedPos.y;
+                    
                     if (windowManager != null) {
                         windowManager.updateViewLayout(flutterView, params);
                     }
