@@ -158,6 +158,14 @@ public class OverlayService extends Service implements View.OnTouchListener {
         }
         int dx = startX == OverlayConstants.DEFAULT_XY ? 0 : startX;
         int dy = startY == OverlayConstants.DEFAULT_XY ? -statusBarHeightPx() : startY;
+        
+        // Apply coordinate clamping to initial position
+        Point clampedInitialPos = clampCoordinates(dx, dy, 
+            WindowSetup.width == -1999 ? -1 : WindowSetup.width,
+            WindowSetup.height != -1999 ? WindowSetup.height : screenHeight());
+        dx = clampedInitialPos.x;
+        dy = clampedInitialPos.y;
+        
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 WindowSetup.width == -1999 ? -1 : WindowSetup.width,
                 WindowSetup.height != -1999 ? WindowSetup.height : screenHeight(),
